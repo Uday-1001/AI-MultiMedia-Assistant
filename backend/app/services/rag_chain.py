@@ -13,7 +13,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Friendly names shown in logs and user-facing messages
 PROVIDER_DISPLAY_NAMES = {
     "google": "Gemini (Google AI)",
     "gemini": "Gemini (Google AI)",
@@ -24,14 +23,9 @@ PROVIDER_DISPLAY_NAMES = {
 
 class RAGChainService:
     """
-    Handles the full Retrieval-Augmented Generation (RAG) pipeline.
-    Supports automatic fallback across multiple LLM providers so that
-    a single API hiccup never leaves the user without an answer.
-
-    Fallback order (skipping providers with no credentials configured):
-      1. Primary provider set in LLM_PROVIDER (.env)
-      2. Groq  — if GROQ_API_KEY is present
-      3. Ollama — always available as a last resort (local)
+    Handles the full RAG pipeline.
+    Fallback across multiple LLM providers
+    Gemini -> Groq -> Ollama (local)
     """
 
     _instance = None
@@ -41,8 +35,6 @@ class RAGChainService:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-
-    # ── LLM helpers ──────────────────────────────────────────────────────────
 
     def _build_gemini(self) -> Any:
         from langchain_google_genai import ChatGoogleGenerativeAI
@@ -76,7 +68,6 @@ class RAGChainService:
         )
 
     def _get_llm(self):
-        """Returns the primary LLM object configured in .env."""
         provider = settings.LLM_PROVIDER
         if provider in ["google", "gemini"]:
             return self._build_gemini()
@@ -91,18 +82,12 @@ class RAGChainService:
             )
 
     def _get_fallback_providers(self) -> List[str]:
-        """
-        Returns an ordered list of fallback providers to try when the primary one fails.
-        A provider is included only if its credentials are actually configured.
-        """
         primary = settings.LLM_PROVIDER
         candidates = []
 
-        # Groq — only if a key is set
         if primary != "groq" and settings.GROQ_API_KEY:
             candidates.append("groq")
 
-        # Ollama — always available locally, but try last
         if primary != "ollama":
             candidates.append("ollama")
 
@@ -118,12 +103,6 @@ class RAGChainService:
         raise ValueError(f"Unknown provider: {provider}")
 
     def _invoke_with_fallback(self, formatted_prompt: str) -> Tuple[str, str]:
-        """
-        Tries the primary LLM first, then works through the fallback list.
-        Returns (answer_text, provider_name_used).
-
-        Raises RuntimeError only when every configured provider has failed.
-        """
         primary = settings.LLM_PROVIDER
         providers_to_try = [primary] + self._get_fallback_providers()
 
@@ -149,14 +128,11 @@ class RAGChainService:
                     provider_error,
                 )
 
-        # All providers exhausted — give the user a clear, friendly message
         raise RuntimeError(
             "Our AI assistant is taking a short break right now and couldn't generate a response. "
             "This usually happens when there's a connectivity issue or an API limit has been reached. "
             "Please wait a moment and try again — we'll be back up shortly!"
         )
-
-    # ── Format helpers ────────────────────────────────────────────────────────
 
     def _get_format_instruction(self, query: str) -> str:
         query_lower = query.lower()
@@ -197,7 +173,6 @@ class RAGChainService:
 
         return "\n\n-------------------------------------\n\n".join(formatted)
 
-    # ── Chain setup ───────────────────────────────────────────────────────────
 
     def _build_chain(self):
         """Builds the LangChain retrieval pipeline using the primary LLM."""
@@ -247,18 +222,8 @@ class RAGChainService:
             chroma_service.initialize(embedding_service.get_embeddings())
         self._build_chain()
 
-    # ── Public entry point ────────────────────────────────────────────────────
 
     def invoke(self, query: str, file_id: Optional[int] = None) -> Dict[str, Any]:
-        """
-        The main entry point for the AI.
-
-        1. Retrieves the most relevant document chunks for the query.
-        2. Builds a prompt with the context and question.
-        3. Sends it to the primary LLM. If that fails, automatically retries
-           with each configured fallback provider (Groq → Ollama) until one succeeds.
-        4. Returns the answer along with source citations and timestamps.
-        """
         if self._chain is None:
             self.initialize()
 
@@ -286,10 +251,8 @@ class RAGChainService:
             format_instruction=format_instruction,
         )
 
-        # Try the primary provider first, then fall back automatically
         answer, provider_used = self._invoke_with_fallback(formatted_prompt)
 
-        # If a fallback stepped in, let the user know in a friendly, non-technical way
         provider_note = ""
         if provider_used != settings.LLM_PROVIDER:
             provider_note = (
