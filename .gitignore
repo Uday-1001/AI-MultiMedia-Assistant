@@ -1,0 +1,61 @@
+# Environments and Secrets
+.env
+venv/
+.venv/
+env/
+.env/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Databases
+*.db
+*.sqlite3
+multimedia_assistant.db
+backend/multimedia_assistant.db
+
+# Vector Databases
+chroma_db/
+backend/chroma_db/
+
+# Data / Storage directories
+backend/storage/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Local documentation
+Details/
