@@ -302,7 +302,6 @@ def apply_custom_theme():
     </style>
     """
 
-    # ── Check backend health ──────────────────────────────────────────────────
     backend_online = False
     try:
         r = requests.get("http://localhost:8000/health", timeout=2)
@@ -326,10 +325,6 @@ def apply_custom_theme():
     with st.sidebar:
         st.markdown(custom_css, unsafe_allow_html=True)
         st.markdown(status_bar_html, unsafe_allow_html=True)
-        
-        # We handle config generation silently without toggles if requested,
-        # but for now we keep the toggle in case they still want light mode.
-        # Actually, let's just enforce the dark mode layout for this specific request.
         
         config_dir = os.path.join(os.path.dirname(__file__), ".streamlit")
         os.makedirs(config_dir, exist_ok=True)
@@ -359,7 +354,6 @@ font = "sans serif"
 headless = true
 port = 8501
 '''
-        # Only write if different to prevent infinite reloads
         current_toml = ""
         if os.path.exists(config_path):
             with open(config_path, "r") as f:

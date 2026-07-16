@@ -5,7 +5,6 @@ from contextlib import contextmanager
 from .models import Base
 from ..config.settings import settings
 
-# For SQLite, check_same_thread=False is needed in multithreaded environments.
 if settings.DATABASE_URL.startswith("sqlite"):
     engine = create_engine(
         settings.DATABASE_URL,

@@ -13,10 +13,6 @@ backend_online = ui_enhancer.apply_custom_theme()
 API_BASE_URL = "http://localhost:8000"
 
 def fetch_statistics():
-    """
-    Fetches the total number of uploaded documents from the backend API.
-    Used to display current session statistics in the sidebar.
-    """
     try:
         response = requests.get(f"{API_BASE_URL}/history/documents", timeout=5)
         if response.status_code == 200:
@@ -26,11 +22,7 @@ def fetch_statistics():
         return []
 
 def main():
-    """
-    Renders the main Home page of the AI Multimedia Knowledge Assistant.
-    Displays the hero section, feature cards, and 'How it works' instructions.
-    """
-    # ── Sidebar ──────────────────────────────────────────────────────────────
+
     with st.sidebar:
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown(
@@ -69,7 +61,6 @@ def main():
             unsafe_allow_html=True,
         )
 
-        # Small spacer to separate stats from profile
         st.markdown(
             "<div style='min-height:40px;'></div>",
             unsafe_allow_html=True,
@@ -92,10 +83,8 @@ def main():
             unsafe_allow_html=True,
         )
 
-    # ── Main Content ─────────────────────────────────────────────────────────
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Hero section
     st.markdown(
         """
         <style>
@@ -170,7 +159,6 @@ def main():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Feature cards ─────────────────────────────────────────────────────────
     feature_col_1, feature_col_2, feature_col_3, feature_col_4 = st.columns(4)
     feature_cards = [
         (feature_col_1, "#60A5FA", "📄", "Any Format, Anywhere",
@@ -197,7 +185,6 @@ def main():
 
     st.markdown("<br><br>", unsafe_allow_html=True)
 
-    # ── How it works ──────────────────────────────────────────────────────────
     st.markdown(
         """
         <div style="text-align:center; color:var(--text-main); font-size:1.4rem;
@@ -233,7 +220,6 @@ def main():
 
     st.markdown("<br><br>", unsafe_allow_html=True)
 
-    # ── Engaging Footer Strip ──────────────────────────────────────────────────────
     st.markdown(
         """
         <div style="display:flex; justify-content:center; gap:2rem; flex-wrap:wrap;

@@ -17,15 +17,13 @@ from ..config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# Try to import the OCR pipeline. If PaddleOCR / PyMuPDF aren't installed the
-# rest of the app still works fine — scanned PDFs will just raise a clear error.
 try:
     from .ocr_pipeline import PDFOCRPipeline
     _ocr_pipeline = PDFOCRPipeline(
         dpi=settings.OCR_DPI,
-        languages=settings.OCR_LANGUAGE.split(","),  # e.g. "en" or "en,fr"
+        languages=settings.OCR_LANGUAGE.split(","),
         char_threshold=settings.OCR_SCANNED_CHAR_THRESHOLD,
-        max_workers=settings.OCR_MAX_WORKERS or None,  # None → auto in the pipeline
+        max_workers=settings.OCR_MAX_WORKERS or None,  
     )
     OCR_AVAILABLE = True
 except ImportError as _ocr_import_err:
@@ -51,19 +49,8 @@ class IngestionService:
         return None
 
     def _load_pdf(self, file_path: str, progress_callback: Optional[callable] = None) -> List[Document]:
-        """
-        Smart PDF loader — detects whether the file is digital or scanned and
-        routes to the appropriate extraction strategy.
-
-        Digital PDFs go through PyPDFLoader (fast, preserves layout metadata).
-        Scanned PDFs go through PaddleOCR (slower, but the only reliable option).
-
-        If a digital PDF somehow produces almost no text (e.g. images embedded
-        inline), we fall back to OCR as a safety net.
-        """
         file_extension = ".pdf"
 
-        # Step 1: check whether the PDF has selectable text at all
         is_scanned = False
         if OCR_AVAILABLE:
             try:
@@ -75,16 +62,13 @@ class IngestionService:
             logger.info("'%s' detected as scanned — routing to OCR pipeline", file_path)
             return self._run_ocr(file_path, progress_callback)
 
-        # Step 2: standard digital PDF extraction
         documents = PyPDFLoader(file_path).load()
 
-        # Annotate with document type so downstream metadata is consistent
         for document in documents:
             document.metadata.setdefault("document_type", "digital")
             document.metadata.setdefault("ocr_confidence", None)
             document.metadata.setdefault("section", None)
 
-        # Step 3: OCR safety net — if we got almost nothing, try OCR anyway
         total_text = " ".join(document.page_content for document in documents).strip()
         if len(total_text) < 100 and OCR_AVAILABLE:
             logger.info(
@@ -98,7 +82,6 @@ class IngestionService:
         return documents
 
     def _run_ocr(self, file_path: str, progress_callback: Optional[callable] = None) -> List[Document]:
-        """Delegate to the OCR pipeline; surface a clear error if unavailable."""
         if not OCR_AVAILABLE:
             raise RuntimeError(
                 "OCR is required for this file but PaddleOCR / PyMuPDF are not installed. "
@@ -108,9 +91,7 @@ class IngestionService:
         return _ocr_pipeline.process(file_path, filename, progress_callback)
 
     def load_document(self, file_path: str, file_type: str, progress_callback: Optional[callable] = None) -> List[Document]:
-        """
-        Loads a document based on its extension. We handle PDFs, Text, Word, and PowerPoint files.
-        """
+
         file_extension = os.path.splitext(file_path)[1].lower()
 
         if file_extension == ".pdf":
@@ -152,11 +133,7 @@ class IngestionService:
         segment_timestamps: Optional[List[Dict]] = None,
         progress_callback: Optional[callable] = None
     ) -> List[Document]:
-        """
-        The main pipeline for turning a file into a series of text chunks that the AI can understand.
-        First, we load the content. Then, we chop it into bite-sized chunks, and finally, we add rich 
-        metadata so the AI knows exactly where the information came from.
-        """
+
         if file_type in ["video", "audio"]:
             documents = self.load_transcript(transcript_path)
             for document in documents:

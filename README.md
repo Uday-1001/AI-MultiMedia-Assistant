@@ -1,53 +1,44 @@
 # AI Multimedia Knowledge Assistant
 
-A production-ready Retrieval-Augmented Generation (RAG) assistant capable of understanding multimedia content using **Streamlit + FastAPI + LangChain + PostgreSQL + ChromaDB + Faster-Whisper**.
+A production-ready Retrieval-Augmented Generation (RAG) assistant capable of understanding multimedia content using **Streamlit + FastAPI + LangChain + SQLite + ChromaDB + Faster-Whisper + EasyOCR**.
 
 ## Features
 
-- Upload and process videos (mp4, mov, mkv, avi, webm)
-- Upload and process audio files (mp3, wav, m4a, flac)
-- Upload and process documents (pdf, docx, pptx, txt)
-- Automatic transcription for audio/video using Faster-Whisper
-- Text extraction for documents using LangChain loaders
-- Embedding generation with configurable providers (Ollama/HuggingFace)
-- Natural language Q&A with source citations
-- Timestamp references for multimedia content
-- Conversation history tracking
+- **Multimedia Processing:** Upload and process videos (mp4, mov, mkv, avi, webm), audio (mp3, wav, m4a, flac), and documents (pdf, docx, pptx, txt).
+- **Intelligent PDF Handling:** Automatically detects digital vs. scanned PDFs. Uses PyMuPDF for digital text and an advanced parallel **EasyOCR** pipeline for scanned/image-based documents.
+- **Audio/Video Transcription:** Automatic, high-quality transcription using Faster-Whisper.
+- **Robust LLM Fallback Chain:** Never goes down! Primary inference through **Gemini**, with automatic fallback to **Groq (Llama)**, and finally local **Ollama** if APIs fail.
+- **Vector Search:** Embedding generation (Ollama/HuggingFace) stored in ChromaDB for fast semantic retrieval.
+- **Modern UI:** A sleek, fully-featured dark-mode Streamlit frontend with interactive feature cards and real-time processing statistics.
+- **Rich Citations:** Natural language Q&A with exact source citations and timestamp references for multimedia.
 
 ## Prerequisites
 
 - Python 3.10+
-- PostgreSQL
-- FFmpeg (for video/audio processing)
-- Ollama (optional, for local LLM/embeddings)
+- FFmpeg (required for video/audio processing)
+- Ollama (optional, for local LLM fallback and embeddings)
 
 ## Setup
 
-1. Clone the repository:
+1. **Clone the repository:**
 ```bash
 git clone <repository-url>
 cd AI_Multimedia_Assistant
 ```
 
-2. Install dependencies:
+2. **Install dependencies:**
 ```bash
 pip install -r requirements.txt
 ```
+*(Note: Installing PyTorch and EasyOCR may take some time depending on your internet connection)*
 
-3. Configure environment:
+3. **Configure environment:**
 ```bash
 cp .env.example .env
-# Edit .env with your configuration
+# Edit .env with your API keys (Google Gemini, Groq)
 ```
 
-4. Set up PostgreSQL database:
-```bash
-# Create database
-createdb multimedia_assistant
-# Or use your preferred PostgreSQL tool
-```
-
-5. Create necessary directories:
+4. **Create necessary directories:**
 ```bash
 mkdir -p storage/uploads storage/transcripts storage/temp chroma_db
 ```
@@ -55,12 +46,14 @@ mkdir -p storage/uploads storage/transcripts storage/temp chroma_db
 ## Running the Application
 
 ### Backend (FastAPI)
+The backend handles all heavy lifting: chunking, OCR, embeddings, and LLM querying.
 ```bash
 cd backend
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Frontend (Streamlit)
+The frontend provides the conversational UI and dashboard.
 ```bash
 cd frontend
 streamlit run Home.py
@@ -68,87 +61,57 @@ streamlit run Home.py
 
 ## Configuration (.env)
 
+Here is a sample of the key configuration variables:
+
 ```env
 # Database
-DATABASE_URL=postgresql://user:password@localhost:5432/multimedia_assistant
+DATABASE_URL=sqlite:///./multimedia_assistant.db
 
-# LLM Provider (groq or ollama)
-LLM_PROVIDER=groq
-GROQ_API_KEY=your_groq_api_key_here
+# LLM Fallback Chain (Primary -> Secondary -> Local)
+LLM_PROVIDER=google
+GOOGLE_API_KEY=your_gemini_key
+GROQ_API_KEY=your_groq_key
+LLM_MODEL=gemini-2.5-flash
+OLLAMA_FALLBACK_MODEL=phi3
 
-# Embedding Provider (ollama or huggingface)
-EMBEDDING_PROVIDER=ollama
-OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+# Embeddings
+EMBEDDING_PROVIDER=huggingface
+
+# OCR Pipeline
+OCR_LANGUAGE=en
+OCR_DPI=200
+OCR_MAX_WORKERS=4
 
 # Whisper settings
 WHISPER_MODEL_SIZE=base
 WHISPER_DEVICE=cpu
 ```
 
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| /upload/ | POST | Upload a file |
-| /upload/{id}/process | POST | Process uploaded file |
-| /chat/ | POST | Ask a question |
-| /history/sessions | GET | Get chat sessions |
-| /history/documents | GET | Get uploaded documents |
-| /history/document/{id} | DELETE | Delete a document |
-| /health | GET | Health check |
-
-## Architecture
+## Architecture Flow
 
 ```
 Streamlit Frontend
        ↓
 REST API (FastAPI)
        ↓
-Upload Service
-       ↓
 Processing Pipeline
+       ├─ Audio/Video → Faster-Whisper Transcription
+       ├─ Digital PDF → PyPDFLoader
+       └─ Scanned PDF → Parallel EasyOCR Pipeline
        ↓
-LangChain Document Loaders → RecursiveCharacterTextSplitter → Metadata Enrichment
+RecursiveCharacterTextSplitter → Metadata Enrichment
        ↓
-Embedding Generation → ChromaDB Vector Store
+Embedding Generation (HuggingFace/Ollama) → ChromaDB Vector Store
        ↓
-Retriever → RAG Chain → LLM
+Retriever → RAG Chain (Gemini → Groq → Ollama) → LLM Response
        ↓
-Answer with Sources
-```
-
-## Project Structure
-
-```
-AI_Multimedia_Assistant/
-├── frontend/
-│   ├── Home.py
-│   └── pages/
-│       ├── Upload.py
-│       ├── Chat.py
-│       └── History.py
-├── backend/
-│   └── app/
-│       ├── api/
-│       ├── services/
-│       ├── prompts/
-│       ├── vectorstore/
-│       ├── database/
-│       └── main.py
-├── storage/
-│   ├── uploads/
-│   ├── transcripts/
-│   └── temp/
-├── database/
-├── chroma_db/
-├── requirements.txt
-└── .env.example
+Answer with Document Sources & Timestamps
 ```
 
 ## Usage
 
-1. Start both backend and frontend
-2. Navigate to the Upload page and add multimedia files
-3. Wait for automatic processing
-4. Go to the Chat page to ask questions
-5. View history on the History page
+1. Start both backend and frontend servers.
+2. Navigate to the **Upload** page in the sidebar and add multimedia files.
+3. Wait for the automatic processing, transcription, and OCR to complete.
+4. Go to the **Chat** page to ask questions about your documents and media.
+5. View system statistics on the **Home** dashboard or previous conversations on the **History** page.

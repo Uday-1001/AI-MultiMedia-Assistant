@@ -60,7 +60,6 @@ async def chat(request: ChatRequest, db = Depends(get_db)):
     try:
         result = rag_chain_service.invoke(request.question, request.file_id)
     except RuntimeError as all_providers_failed:
-        # Every configured LLM provider was tried and failed — surface a friendly message
         logger.error("All LLM providers exhausted: %s", all_providers_failed)
         raise HTTPException(
             status_code=503,

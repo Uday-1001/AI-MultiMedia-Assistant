@@ -81,10 +81,6 @@ async def get_documents(db = Depends(get_db)):
 
 @router.delete("/document/{file_id}")
 async def delete_document(file_id: int, db = Depends(get_db)):
-    """
-    Removes a document from both the relational database and the vector store, 
-    and deletes physical files to free up space.
-    """
     database_file_record = db.query(UploadedFile).filter(UploadedFile.id == file_id).first()
     if not database_file_record:
         raise HTTPException(status_code=404, detail="We couldn't locate that document in the database.")

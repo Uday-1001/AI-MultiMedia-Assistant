@@ -28,6 +28,5 @@ langchain-groq>=0.1.0
 pdf2image>=1.17.0
 pytesseract>=0.3.13
 Pillow>=10.0.0
-# OCR pipeline for scanned PDFs (EasyOCR supports Python 3.12+ on Windows)
 easyocr>=1.7.0
 PyMuPDF>=1.24.0

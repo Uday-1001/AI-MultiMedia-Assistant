@@ -5,10 +5,6 @@ from langchain_core.documents import Document
 
 
 class MetadataEnricher:
-    """
-    Adds useful context (metadata) to document chunks before they are saved to the database.
-    This helps the AI know exactly where a piece of information came from.
-    """
     def enrich(
         self,
         document: Document,
@@ -31,7 +27,6 @@ class MetadataEnricher:
         document.metadata["language"] = language
         document.metadata["embedding_id"] = str(uuid.uuid4())
 
-        # OCR-specific fields — present for scanned docs, None for digital
         document.metadata["document_type"] = document_type or document.metadata.get("document_type", "digital")
         document.metadata["ocr_confidence"] = ocr_confidence if ocr_confidence is not None else document.metadata.get("ocr_confidence")
 

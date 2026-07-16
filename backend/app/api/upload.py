@@ -15,7 +15,6 @@ from ..config.settings import settings
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 
-# Global dictionary to track progress of background tasks
 processing_progress: Dict[int, dict] = {}
 
 
@@ -139,11 +138,9 @@ async def get_process_status(file_id: int, db = Depends(get_db)):
 
     progress = processing_progress.get(file_id, {"current": 0, "total": 0, "status": database_file_record.status, "message": ""})
     
-    # If the DB says error but progress dictionary hasn't caught up (or was cleared)
     if database_file_record.status == "error":
         return ProgressResponse(file_id=file_id, status="error", current=0, total=0, message=database_file_record.processing_error or "Unknown error")
     
-    # If the DB says processed
     if database_file_record.status == "processed":
         return ProgressResponse(file_id=file_id, status="processed", current=progress["total"], total=progress["total"], message="Done")
         
@@ -207,7 +204,6 @@ def _process_file_task(file_id: int):
         metadatas = [document.metadata for document in documents]
         ids = [f"{database_file_record.id}_{i}" for i in range(len(documents))]
 
-        # Guard: nothing to index — file produced no extractable text
         if not texts:
             raise Exception("No text could be extracted from this file, even after attempting OCR. The file may be heavily corrupted, password-protected, or contain only images with no recognisable characters.")
 

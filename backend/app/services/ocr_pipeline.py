@@ -1,22 +1,3 @@
-"""
-OCR pipeline for scanned / image-based PDFs.
-
-Workflow:
-  1. Detect whether a PDF is text-based or scanned (is_scanned).
-  2. Rasterise pages with PyMuPDF and convert to grayscale.
-  3. Run EasyOCR in parallel — each worker thread gets its own Reader instance
-     so threads don't block each other on the model mutex.
-  4. Re-assemble pages in order and return List[Document].
-
-Performance notes:
-  - DPI 200 is the sweet spot: ~56% less pixels than 300 DPI with negligible
-    accuracy loss on standard print-resolution scans.
-  - Grayscale cuts memory and OCR time by ~30% vs RGB.
-  - Thread-local Readers mean N pages run truly concurrently on N cores.
-  - max_workers defaults to half the CPU count — leaves room for the FastAPI
-    event loop and embedding model to breathe.
-"""
-
 import io
 import logging
 import os
@@ -26,12 +7,8 @@ import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple, Callable
 
-# Suppress PyTorch DataLoader warning about pin_memory on CPU
 warnings.filterwarnings("ignore", message=".*pin_memory.*")
 
-# CRITICAL FIX for parallel CPU inference:
-# Must be set before importing numpy/torch to prevent internal libraries
-# from spawning dozens of threads per worker and thrashing the CPU.
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
@@ -46,16 +23,6 @@ from PIL import Image, ImageFilter, ImageOps
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Thread-local EasyOCR readers
-#
-# Why thread-local instead of a shared singleton?
-# EasyOCR's Reader holds PyTorch model state that isn't thread-safe under
-# concurrent readtext() calls. Giving each worker thread its own Reader
-# lets pages run in parallel without locks, at the cost of ~300 MB RAM per
-# extra thread — acceptable for a document pipeline.
-# ---------------------------------------------------------------------------
-
 _thread_local = threading.local()
 
 
@@ -66,11 +33,6 @@ def _get_reader(languages: List[str]):
             import easyocr
             import torch
             
-            # CRITICAL FIX for parallel CPU inference:
-            # By default, PyTorch uses all available CPU cores for a single model.
-            # If we have 4 workers running 4 models, they spawn 4 x 16 = 64 threads,
-            # causing massive thread thrashing and slowing everything down.
-            # We restrict each model to 1 or 2 internal threads to fix this.
             torch.set_num_threads(2)
             
             _thread_local.reader = easyocr.Reader(languages, gpu=False, verbose=False)
@@ -80,34 +42,20 @@ def _get_reader(languages: List[str]):
     return _thread_local.reader
 
 
-# ---------------------------------------------------------------------------
-# Image helpers
-# ---------------------------------------------------------------------------
-
 def _page_to_array(page: fitz.Page, dpi: int) -> np.ndarray:
-    """
-    Rasterise one PDF page directly to a grayscale numpy array.
-    Skipping PIL RGB→grayscale conversion saves one intermediate copy.
-    """
     zoom = dpi / 72
     matrix = fitz.Matrix(zoom, zoom)
-    # "L" colorspace = 8-bit grayscale — much smaller than RGB
     pixmap = page.get_pixmap(matrix=matrix, alpha=False, colorspace=fitz.csGRAY)
     image = Image.frombytes("L", (pixmap.width, pixmap.height), pixmap.samples)
 
-    # Light sharpening helps OCR on slightly blurry scans
     image = image.filter(ImageFilter.SHARPEN)
 
-    # Stack to 3-channel array because EasyOCR expects HxWx3
     image_array = np.array(image)
     return np.stack([image_array, image_array, image_array], axis=-1)
 
 
 def _sort_into_reading_order(ocr_results) -> List[Tuple]:
-    """
-    EasyOCR doesn't guarantee top-to-bottom order. We bucket detections into
-    row-groups (15 px tolerance) then sort left-to-right within each group.
-    """
+
     annotated = []
     for bbox, text, confidence in ocr_results:
         top_y = min(pt[1] for pt in bbox)
@@ -119,10 +67,7 @@ def _sort_into_reading_order(ocr_results) -> List[Tuple]:
 
 
 def _detect_section(text: str) -> Optional[str]:
-    """
-    Lightweight heading heuristic — catches all-caps titles, numbered sections,
-    and colon-terminated labels. Returns the first match or None.
-    """
+
     for line in text.splitlines():
         line = line.strip()
         if not line:
@@ -137,19 +82,7 @@ def _detect_section(text: str) -> Optional[str]:
     return None
 
 
-# ---------------------------------------------------------------------------
-# Main class
-# ---------------------------------------------------------------------------
-
 class PDFOCRPipeline:
-    """
-    Parallel scanned-PDF processor: EasyOCR + PyMuPDF.
-
-    Usage:
-        pipeline = PDFOCRPipeline(dpi=200, languages=["en"], max_workers=4)
-        if pipeline.is_scanned("report.pdf"):
-            docs = pipeline.process("report.pdf", filename="report.pdf")
-    """
 
     SCANNED_CHAR_THRESHOLD = 10
 
@@ -167,10 +100,7 @@ class PDFOCRPipeline:
             self.SCANNED_CHAR_THRESHOLD = char_threshold
 
     def is_scanned(self, pdf_path: str) -> bool:
-        """
-        Count selectable characters across all pages. If the average per page
-        is below the threshold the document is almost certainly image-only.
-        """
+  
         try:
             pdf_document = fitz.open(pdf_path)
             total_chars = sum(len(p.get_text("text").strip()) for p in pdf_document)
@@ -184,17 +114,7 @@ class PDFOCRPipeline:
             return True
 
     def process(self, pdf_path: str, filename: str, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> List[Document]:
-        """
-        Parallel OCR across all pages.
-
-        Strategy:
-          1. Rasterise every page to a numpy array (fast, done in the main thread).
-          2. Submit each page's OCR work to a thread pool — each thread owns
-             its own EasyOCR Reader so there's no locking on the model.
-          3. Collect results, sort by page number, return Documents.
-
-        Pages that raise any exception are skipped with a warning.
-        """
+    
         try:
             pdf = fitz.open(pdf_path)
         except Exception as open_error:
@@ -203,8 +123,6 @@ class PDFOCRPipeline:
         total_pages = len(pdf)
         logger.info("Starting parallel OCR on '%s' (%d pages, %d workers)", filename, total_pages, self.max_workers)
 
-        # Rasterise all pages upfront — fitz is not thread-safe so we do this
-        # sequentially, but it's fast (just pixel math, no ML inference).
         page_arrays: Dict[int, np.ndarray] = {}
         for i in range(total_pages):
             try:
@@ -214,9 +132,8 @@ class PDFOCRPipeline:
 
         pdf.close()
 
-        # OCR all rasterised pages in parallel
         results: Dict[int, Document] = {}
-        languages = self.languages  # capture for lambda closure
+        languages = self.languages  
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
             future_to_page = {
@@ -238,7 +155,6 @@ class PDFOCRPipeline:
                 except Exception as worker_error:
                     logger.warning("OCR worker failed on page %d: %s — skipping.", page_num + 1, worker_error)
 
-        # Sort by original page order before returning
         documents = [results[i] for i in sorted(results)]
         logger.info("OCR complete: %d/%d pages extracted from '%s'.", len(documents), total_pages, filename)
         return documents
@@ -251,10 +167,7 @@ class PDFOCRPipeline:
         pdf_path: str,
         languages: List[str],
     ) -> Optional[Document]:
-        """
-        Worker function — runs in its own thread.
-        Gets/creates the thread-local Reader, runs OCR, returns a Document or None.
-        """
+
         page_label = page_num + 1
         reader = _get_reader(languages)
 

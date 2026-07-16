@@ -1,7 +1,6 @@
 import sys
 import os
 
-# Monkeypatch starlette.middleware.gzip to fix streamlit compatibility
 try:
     import starlette.middleware.gzip
     if not hasattr(starlette.middleware.gzip, "DEFAULT_EXCLUDED_CONTENT_TYPES"):
@@ -19,7 +18,6 @@ except ImportError:
 import streamlit.web.cli as stcli
 
 if __name__ == "__main__":
-    # Ensure working directory is frontend
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     sys.argv = ["streamlit", "run", "Home.py"]
     sys.exit(stcli.main())

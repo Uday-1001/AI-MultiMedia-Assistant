@@ -31,11 +31,10 @@ class Settings(BaseSettings):
     
     FRONTEND_PORT: int = Field(default=8501)
 
-    # OCR settings — used when a scanned/image-based PDF is detected
-    OCR_DPI: int = Field(default=200)  # 200 is the speed/accuracy sweet spot
+    OCR_DPI: int = Field(default=200)
     OCR_LANGUAGE: str = Field(default="en")
     OCR_SCANNED_CHAR_THRESHOLD: int = Field(default=10)
-    OCR_MAX_WORKERS: int = Field(default=0)  # 0 = auto (half of cpu_count)
+    OCR_MAX_WORKERS: int = Field(default=0)
 
     class Config:
         env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../.env")
