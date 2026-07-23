@@ -11,7 +11,7 @@ try:
                 self.app = app
             async def __call__(self, scope, receive, send) -> None:
                 await self.app(scope, receive, send)
-        starlette.middleware.gzip.IdentityResponder = IdentityResponder
+        starlette.middleware.gzip.IdentityResponder = IdentityResponder #type: ignore
 except ImportError:
     pass
 

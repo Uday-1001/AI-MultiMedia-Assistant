@@ -30,10 +30,7 @@ TYPE_META = {
 
 
 def get_file_type(filename: str) -> Optional[str]:
-    """
-    Determines the category of the uploaded file based on its extension.
-    Returns 'video', 'audio', 'document', or None if unsupported.
-    """
+    # Map file extensions to their broad category (video, audio, document)
     file_extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     for format_category, valid_extensions in SUPPORTED_FORMATS.items():
         if file_extension in valid_extensions:
@@ -54,8 +51,8 @@ ERROR_HINTS = {
 }
 
 
-def friendly_error(response=None, exception: Exception = None) -> str:
-    """Return a human-readable error string from an API response or exception."""
+def friendly_error(response=None, exception: Optional[Exception] = None) -> str:
+    # Parse raw error details into friendly UI messages
     raw = ""
     if exception is not None:
         raw = str(exception).lower()
@@ -77,7 +74,7 @@ def friendly_error(response=None, exception: Exception = None) -> str:
 
 
 def main():
-    # ── Page-level CSS ───────────────────────────────────────────────────────
+
     st.markdown(
         """
         <style>
@@ -123,7 +120,7 @@ def main():
         unsafe_allow_html=True,
     )
 
-    # ── Hero header ──────────────────────────────────────────────────────────
+
     st.markdown(
         """
         <div style="margin-bottom:0.25rem;">
@@ -140,7 +137,7 @@ def main():
         unsafe_allow_html=True,
     )
 
-    # ── Supported format pills ───────────────────────────────────────────────
+
     st.markdown(
         """
         <div style="margin-bottom:1.75rem;">
@@ -162,7 +159,7 @@ def main():
         unsafe_allow_html=True,
     )
 
-    # ── Upload area ──────────────────────────────────────────────────────────
+
     uploaded_file = st.file_uploader(
         "Drag & drop your file here, or click to browse",
         type=["mp4","mov","mkv","avi","webm","mp3","wav","m4a","flac","pdf","docx","pptx","txt"],
@@ -172,12 +169,12 @@ def main():
 
     if uploaded_file:
         file_type = get_file_type(uploaded_file.name)
-        meta = TYPE_META.get(file_type, {"icon": "📁", "label": "Unknown", "color": "#94A3B8"})
+        meta = TYPE_META.get(file_type or "", {"icon": "📁", "label": "Unknown", "color": "#94A3B8"})
         size_mb = uploaded_file.size / (1024 * 1024)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Build file info card — single-line HTML avoids Streamlit's indented-code-block quirk
+
         warning_html = "<div style='color:#FBBF24;font-size:0.8rem;'>⚠️ Audio/video will be transcribed — large files may take a few minutes.</div>" if file_type in ['video', 'audio'] else ""
         card_html = (
             '<div class="info-card" style="margin-bottom:1rem;">'
@@ -194,7 +191,7 @@ def main():
         )
         st.markdown(card_html, unsafe_allow_html=True)
 
-        # Look up whether this file has been uploaded before (works across page refreshes)
+
         existing_file_id = st.session_state.get(f"uploaded_{uploaded_file.name}", {}).get("file_id")
         if not existing_file_id:
             try:
@@ -221,14 +218,14 @@ def main():
             )
         st.markdown("<div style='margin-bottom:0.75rem'></div>", unsafe_allow_html=True)
 
-        # Upload button
+
         button_column, space_column = st.columns([2, 5])
         with button_column:
             if st.button(f"🚀 Upload & Process {uploaded_file.name[:30]}{'…' if len(uploaded_file.name)>30 else ''}",
                          type="primary", use_container_width=True):
-                # Step 1 — upload
+
                 with st.status("📤 Uploading your file…", expanded=True) as status:
-                    files = {"file": (uploaded_file.name, uploaded_file.getbuffer())}
+                    files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
                     try:
                         response = requests.post(
                             f"{API_BASE_URL}/upload/",
@@ -245,7 +242,7 @@ def main():
                         file_id = result.get("file_id")
                         st.write(f"✅ File received! ID: `{file_id}`")
 
-                        # Step 2 — process
+
                         status.update(label="⚙️ Starting processing...", expanded=True)
                         process_response = requests.post(
                             f"{API_BASE_URL}/upload/{file_id}/process",
@@ -283,7 +280,7 @@ def main():
                                                 expanded=False,
                                             )
                                             st.session_state[f"file_{file_id}"] = result
-                                            # Save so the "View File" link can build its URL
+
                                             st.session_state[f"uploaded_{uploaded_file.name}"] = {"file_id": file_id}
                                             break
                                         elif job_status == "error":
@@ -294,7 +291,7 @@ def main():
                                         time.sleep(1.5)
                                     else:
                                         time.sleep(2)
-                                except Exception as error:
+                                except Exception:
                                     time.sleep(2)
                                     
                         else:
@@ -314,7 +311,7 @@ def main():
 
     st.markdown("<br><br>", unsafe_allow_html=True)
 
-    # ── How it works strip ───────────────────────────────────────────────────
+
     st.markdown(
         "<div style='color:var(--text-main); font-weight:700; font-size:1rem;"
         " margin-bottom:1rem;'>How it works</div>",

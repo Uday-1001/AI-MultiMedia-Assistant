@@ -16,7 +16,7 @@ ui_enhancer.apply_custom_theme()
 
 API_BASE_URL = "http://localhost:8000"
 
-# ── Session-state defaults ───────────────────────────────────────────────────
+# Initialize session state for tracking chat history and selected files
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "session_id" not in st.session_state:
@@ -28,7 +28,7 @@ if "show_end_dialog" not in st.session_state:
 
 
 def do_end_session():
-    """Call backend to clear history and wipe frontend state."""
+    # Clear chat history and reset session
     if st.session_state.session_id:
         try:
             response = requests.post(
@@ -46,7 +46,7 @@ def do_end_session():
 
 
 def main():
-    # ── Extra CSS for this page ──────────────────────────────────────────────
+    # Custom styling for the Chat page components
     st.markdown(
         """
         <style>
@@ -72,7 +72,7 @@ def main():
         unsafe_allow_html=True,
     )
 
-    # ── Sidebar ──────────────────────────────────────────────────────────────
+    # Sidebar for selecting data sources and managing the session
     with st.sidebar:
         st.markdown(
             "<div style='font-size:1.1rem; font-weight:700; color:var(--text-main);"
@@ -86,7 +86,7 @@ def main():
             unsafe_allow_html=True,
         )
 
-        # Document selector
+        # Dropdown to filter context to a specific document
         try:
             response = requests.get(f"{API_BASE_URL}/history/documents", timeout=5)
             if response.status_code == 200:
@@ -110,7 +110,7 @@ def main():
 
         st.markdown("<hr style='border-color:var(--border-color); margin:1rem 0;'>", unsafe_allow_html=True)
 
-        # Session stats
+        # Display current session metrics
         message_count = len(st.session_state.messages)
         st.markdown(
             f"""
@@ -130,7 +130,7 @@ def main():
             unsafe_allow_html=True,
         )
 
-        # Spacer then End Session at the bottom
+        # Bottom spacer before session controls
         st.markdown("<div style='min-height:40px;'></div>", unsafe_allow_html=True)
 
         st.markdown("<div class='end-session-btn'>", unsafe_allow_html=True)
@@ -139,7 +139,7 @@ def main():
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # Guest profile
+        # Render a mock user profile card
         st.markdown(
             """
             <div style="background-color:var(--surface-color); border:1px solid var(--border-color);
@@ -157,7 +157,7 @@ def main():
             unsafe_allow_html=True,
         )
 
-    # ── End-session confirmation ─────────────────────────────────────────────
+    # Render the confirmation dialog for ending a session
     if st.session_state.show_end_dialog:
         st.markdown(
             """
@@ -188,7 +188,7 @@ def main():
                 st.rerun()
         st.stop()
 
-    # ── Empty-state welcome ──────────────────────────────────────────────────
+    # Render a welcome screen with quick-start prompts if chat is empty
     if not st.session_state.messages:
         st.markdown(
             """
@@ -223,14 +223,14 @@ def main():
             unsafe_allow_html=True,
         )
 
-    # ── Chat history ─────────────────────────────────────────────────────────
+    # Display previous messages in the conversation
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
             if message.get("sources"):
                 st.caption(f"📎 Sources: {', '.join(message['sources'])}")
 
-    # ── Chat input ───────────────────────────────────────────────────────────
+    # Input field and submit logic for new questions
     if prompt := st.chat_input("Ask a question, request a summary, or create flashcards…"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):

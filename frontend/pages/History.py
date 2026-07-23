@@ -16,7 +16,7 @@ ui_enhancer.apply_custom_theme()
 
 API_BASE_URL = "http://localhost:8000"
 
-# ── Page-level CSS ────────────────────────────────────────────────────────────
+# Custom CSS for the History page components
 st.markdown(
     """
     <style>
@@ -109,7 +109,7 @@ def status_pill(status: str) -> str:
 
 
 def main():
-    # ── Hero ─────────────────────────────────────────────────────────────────
+    # Render main page title and description
     st.markdown(
         """
         <div style="margin-bottom:1.5rem;">
@@ -126,7 +126,7 @@ def main():
 
     tab1, tab2 = st.tabs(["💬 Chat Sessions", "📁 Uploaded Documents"])
 
-    # ── TAB 1 — Chat Sessions ─────────────────────────────────────────────────
+    # Render the Chat Sessions tab
     with tab1:
         st.markdown(
             "<div style='color:var(--text-muted); font-size:0.88rem; margin-bottom:1rem;'>"
@@ -170,30 +170,38 @@ def main():
                                     "No messages in this session.</div>",
                                     unsafe_allow_html=True,
                                 )
-                            for message in messages:
-                                role    = message.get("role", "unknown")
-                                content = message.get("content", "")
-                                is_user_message = role == "user"
-                                bubble_class = "msg-user" if is_user_message else "msg-assistant"
-                                label_html = (
-                                    f'<div class="msg-label" style="color:{"#60A5FA" if is_user_message else "#C084FC"};">'
-                                    f'{"🧑 You" if is_user_message else "🧠 Assistant"}</div>'
-                                )
-                                st.markdown(
-                                    f'<div class="msg-bubble {bubble_class}">'
-                                    f'{label_html}'
-                                    f'{content}'
-                                    f'</div>',
-                                    unsafe_allow_html=True,
-                                )
-                                if message.get("sources"):
-                                    st.caption(f"📎 Sources: {message['sources']}")
+                            else:
+                                html_content = ""
+                                for message in messages:
+                                    role    = message.get("role", "unknown")
+                                    content = message.get("content", "")
+                                    
+                                    # Truncate extremely long messages (e.g. parsed docs) to prevent browser freezes
+                                    if len(content) > 3000:
+                                        content = content[:3000] + "\n\n... *(Message truncated for display)*"
+                                        
+                                    is_user_message = role == "user"
+                                    bubble_class = "msg-user" if is_user_message else "msg-assistant"
+                                    label_html = (
+                                        f'<div class="msg-label" style="color:{"#60A5FA" if is_user_message else "#C084FC"};">'
+                                        f'{"🧑 You" if is_user_message else "🧠 Assistant"}</div>'
+                                    )
+                                    html_content += (
+                                        f'<div class="msg-bubble {bubble_class}">'
+                                        f'{label_html}'
+                                        f'{content}'
+                                        f'</div>'
+                                    )
+                                    if message.get("sources"):
+                                        html_content += f'<div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem; margin-top:-0.2rem; padding-left:1rem;">📎 Sources: {message["sources"]}</div>'
+                                
+                                st.markdown(html_content, unsafe_allow_html=True)
             else:
                 st.error(f"Could not load sessions: {response.text}")
         except Exception as error:
             st.error(f"Could not reach the server: {error}")
 
-    # ── TAB 2 — Uploaded Documents ────────────────────────────────────────────
+    # Render the Uploaded Documents tab
     with tab2:
         col_search, col_space = st.columns([3, 4])
         with col_search:

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = Field(default="")
     GOOGLE_API_KEY: str = Field(default="")
     OLLAMA_BASE_URL: str = Field(default="http://localhost:11434")
-    LLM_MODEL: str = Field(default="gemini-2.5-flash")
+    LLM_MODEL: str = Field(default="gemini-3.6-flash")
     OLLAMA_FALLBACK_MODEL: str = Field(default="phi3")
     
     EMBEDDING_PROVIDER: str = Field(default="huggingface")

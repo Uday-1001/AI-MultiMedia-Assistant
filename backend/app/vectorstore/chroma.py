@@ -32,10 +32,12 @@ class ChromaService:
         return self._vectorstore
 
     @property
-    def vectorstore(self) -> Chroma:
+    def vectorstore(self) -> Optional[Chroma]:
         return self._vectorstore
 
     def get_collection(self):
+        if self._client is None:
+            raise ValueError("Chroma client not initialized.")
         return self._client.get_or_create_collection(settings.CHROMA_COLLECTION_NAME)
 
     def reset(self):

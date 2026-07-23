@@ -46,12 +46,13 @@ async def upload_file(
     Accepts a multimedia file or document from the user, saves it to disk, 
     and registers it in the database for asynchronous processing.
     """
-    file_type = ingestion_service.get_file_type(file.filename)
+    filename = file.filename or "unknown"
+    file_type = ingestion_service.get_file_type(filename)
     if not file_type:
         raise HTTPException(status_code=400, detail="We don't support this file format just yet. Please try a different one.")
     
     file_id = uuid.uuid4().hex[:8]
-    file_extension = os.path.splitext(file.filename)[1]
+    file_extension = os.path.splitext(filename)[1]
     saved_filename = f"{file_id}{file_extension}"
     save_path = os.path.join(settings.UPLOAD_DIR, saved_filename)
     
@@ -64,7 +65,7 @@ async def upload_file(
     
     database_file_record = UploadedFile(
         filename=saved_filename,
-        original_filename=file.filename,
+        original_filename=filename,
         file_type=file_type,
         file_size=file_size,
         file_path=save_path,
@@ -75,8 +76,8 @@ async def upload_file(
     db.refresh(database_file_record)
     
     return UploadResponse(
-        file_id=database_file_record.id,
-        filename=database_file_record.original_filename,
+        file_id=int(str(database_file_record.id)), # type: ignore
+        filename=str(database_file_record.original_filename), # type: ignore
         file_type=file_type,
         status="uploaded",
         message="File uploaded successfully. Ready for processing."
@@ -174,28 +175,28 @@ def _process_file_task(file_id: int):
         def update_progress(current: int, total: int, progress_message: str = ""):
             processing_progress[file_id] = {"current": current, "total": total, "status": "processing", "message": progress_message}
 
-        if database_file_record.file_type == "video":
+        if str(database_file_record.file_type) == "video":
             update_progress(0, 100, "🎬 Listening to video and creating transcript...")
             transcript, transcript_path, segments = transcription_service.transcribe_video(
-                database_file_record.file_path, settings.TRANSCRIPT_DIR
+                str(database_file_record.file_path), settings.TRANSCRIPT_DIR
             )
-            database_file_record.transcript_path = transcript_path
-        elif database_file_record.file_type == "audio":
+            database_file_record.transcript_path = transcript_path # type: ignore
+        elif str(database_file_record.file_type) == "audio":
             update_progress(0, 100, "🎧 Listening to audio and creating transcript...")
             transcript, transcript_path, segments = transcription_service.transcribe_audio_file(
-                database_file_record.file_path, settings.TRANSCRIPT_DIR
+                str(database_file_record.file_path), settings.TRANSCRIPT_DIR
             )
-            database_file_record.transcript_path = transcript_path
+            database_file_record.transcript_path = transcript_path # type: ignore
         else:
             segments = None
             update_progress(0, 100, "📄 Extracting text from document...")
         
         documents = ingestion_service.process_document(
-            file_path=database_file_record.file_path,
-            file_id=database_file_record.id,
-            filename=database_file_record.original_filename,
-            file_type=database_file_record.file_type,
-            transcript_path=database_file_record.transcript_path,
+            file_path=str(database_file_record.file_path),
+            file_id=int(str(database_file_record.id)),
+            filename=str(database_file_record.original_filename),
+            file_type=str(database_file_record.file_type),
+            transcript_path=str(database_file_record.transcript_path) if str(database_file_record.transcript_path) != "None" else None,
             segment_timestamps=segments,
             progress_callback=update_progress
         )
@@ -215,8 +216,8 @@ def _process_file_task(file_id: int):
 
         chroma_service.add_documents(texts, metadatas, ids)
         
-        database_file_record.status = "processed"
-        database_file_record.processing_error = None
+        database_file_record.status = "processed" # type: ignore
+        database_file_record.processing_error = None # type: ignore
         db.commit()
         
         update_progress(100, 100, "Done")
@@ -225,8 +226,8 @@ def _process_file_task(file_id: int):
         db.rollback()
         database_file_record = db.query(UploadedFile).filter(UploadedFile.id == file_id).first()
         if database_file_record:
-            database_file_record.status = "error"
-            database_file_record.processing_error = str(processing_error)
+            database_file_record.status = "error" # type: ignore
+            database_file_record.processing_error = str(processing_error) # type: ignore
             db.commit()
         processing_progress[file_id] = {"current": 0, "total": 0, "status": "error", "message": str(processing_error)}
     finally:
