@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     
     FRONTEND_PORT: int = Field(default=8501)
 
-    OCR_DPI: int = Field(default=200)
+    OCR_DPI: int = Field(default=400)
     OCR_LANGUAGE: str = Field(default="en")
     OCR_SCANNED_CHAR_THRESHOLD: int = Field(default=10)
     OCR_MAX_WORKERS: int = Field(default=0)

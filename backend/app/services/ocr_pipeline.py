@@ -65,12 +65,12 @@ def _get_reader(languages: List[str]) -> Any:
 
 # Image processing utilities
 
-def _page_to_image(page: fitz.Page, dpi: int, max_px: int = 3000) -> np.ndarray:
-    # Convert PDF page to a sharpened RGB image optimized for EasyOCR
+def _page_to_image(page: fitz.Page, dpi: int, max_px: int = 6000) -> np.ndarray:
+    # Convert PDF page to a high-contrast RGB image optimized for EasyOCR
     zoom = dpi / 72
     matrix = fitz.Matrix(zoom, zoom)
-    pixmap = page.get_pixmap(matrix=matrix, alpha=False, colorspace=fitz.csGRAY)
-    image = Image.frombytes("L", (pixmap.width, pixmap.height), pixmap.samples)
+    pixmap = page.get_pixmap(matrix=matrix, alpha=False, colorspace=fitz.csRGB)
+    image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
 
     w, h = image.size
     if max(w, h) > max_px:
@@ -78,10 +78,11 @@ def _page_to_image(page: fitz.Page, dpi: int, max_px: int = 3000) -> np.ndarray:
         image = image.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
         logger.debug("Page resized from %dx%d to %dx%d before OCR.", w, h, *image.size)
 
-    image = image.filter(ImageFilter.SHARPEN)
-    # EasyOCR expects RGB
-    image_rgb = image.convert("RGB")
-    return np.array(image_rgb)
+    # Enhance contrast instead of sharpening (which can create noise around letters)
+    from PIL import ImageEnhance
+    image = ImageEnhance.Contrast(image).enhance(1.5)
+    
+    return np.array(image)
 
 
 def _sort_into_reading_order(results) -> List[Tuple]:
@@ -242,8 +243,14 @@ class PDFOCRPipeline:
         page_label = page_num + 1
         reader = _get_reader(languages)
 
-        # Run inference using the thread-local reader
-        raw_results = reader.readtext(img_array, batch_size=4)
+        # Run inference using the thread-local reader with high-accuracy settings
+        raw_results = reader.readtext(
+            img_array, 
+            batch_size=4,
+            decoder='beamsearch',
+            mag_ratio=1.5,
+            adjust_contrast=0.5
+        )
 
         if not raw_results:
             logger.debug("Page %d: no text detected.", page_label)
