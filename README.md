@@ -5,10 +5,10 @@ A production-ready Retrieval-Augmented Generation (RAG) assistant capable of und
 ## Features
 
 - **Multimedia Processing:** Upload and process videos (mp4, mov, mkv, avi, webm), audio (mp3, wav, m4a, flac), and documents (pdf, docx, pptx, txt).
-- **Intelligent PDF Handling:** Automatically detects digital vs. scanned PDFs. Uses PyMuPDF for digital text and an advanced parallel **EasyOCR** pipeline for scanned/image-based documents.
+- **Intelligent PDF Handling:** Uses **Docling** as the primary parser for deep document understanding, with fallback to PyMuPDF and an advanced parallel **EasyOCR** pipeline for scanned/image-based documents.
 - **Audio/Video Transcription:** Automatic, high-quality transcription using Faster-Whisper.
 - **Robust LLM Fallback Chain:** Never goes down! Primary inference through **Gemini**, with automatic fallback to **Groq (Llama)**, and finally local **Ollama** if APIs fail.
-- **Vector Search:** Embedding generation (Ollama/HuggingFace) stored in ChromaDB for fast semantic retrieval.
+- **Advanced Hybrid Retrieval:** Combines sparse (BM25) and dense (ChromaDB) vector search, augmented with **Multi-Query Expansion** and **CrossEncoder Reranking** for high-precision semantic retrieval.
 - **Modern UI:** A sleek, fully-featured dark-mode Streamlit frontend with interactive feature cards and real-time processing statistics.
 - **Rich Citations:** Natural language Q&A with exact source citations and timestamp references for multimedia.
 
@@ -95,15 +95,17 @@ Streamlit Frontend
 REST API (FastAPI)
        ↓
 Processing Pipeline
-       ├─ Audio/Video → Faster-Whisper Transcription
-       ├─ Digital PDF → PyPDFLoader
-       └─ Scanned PDF → Parallel EasyOCR Pipeline
+        ├─ Audio/Video → Faster-Whisper Transcription
+        ├─ Document Parsing → Docling (Primary) / PyMuPDF (Fallback)
+        └─ Scanned PDF → Parallel EasyOCR Pipeline
        ↓
-RecursiveCharacterTextSplitter → Metadata Enrichment
+RecursiveCharacterTextSplitter (Optimized Chunking) → Metadata Enrichment
        ↓
-Embedding Generation (HuggingFace/Ollama) → ChromaDB Vector Store
+Embedding Generation (HuggingFace) → ChromaDB Vector Store
        ↓
-Retriever → RAG Chain (Gemini → Groq → Ollama) → LLM Response
+Multi-Query Expansion → Hybrid Retriever (BM25 + Chroma) → CrossEncoder Reranker
+       ↓
+RAG Chain (Gemini → Groq → Ollama) → LLM Response
        ↓
 Answer with Document Sources & Timestamps
 ```
